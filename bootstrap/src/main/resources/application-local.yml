@@ -1,97 +1,170 @@
 # Local Development Environment Configuration
-# 本地开发环境配置
 
-# 服务端口 (网关服务端口 8080，与架构规划一致)
 server:
   port: 8080
 
-# 说明:
-# - 日志输出到控制台，彩色格式 (在 logback-spring.xml 中配置)
-# - 日志级别: 项目包 DEBUG，框架包 WARN
-# - 数据库连接池: Druid (initial-size=2/min-idle=1/max-active=5)
-# - MyBatis-Plus: DEBUG 日志 + SQL 格式化
-# - Druid 监控: 启用 StatViewServlet
+# Gateway backend service URLs
+gateway:
+  services:
+    auth: http://localhost:8001
+    product: http://localhost:8002
+    point: http://localhost:8003
+    order: http://localhost:8004
+  auth:
+    validate-url: http://localhost:8001/api/v1/internal/auth/validate
 
+# Spring Cloud Gateway Routes
 spring:
-  # Redis 配置
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      database: 0
-      # password: difyai123456  # 本地 Redis 容器未配置密码
-      
-  # 数据源配置
-  datasource:
-    url: jdbc:mysql://localhost:3307/awsome_shop_gateway?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: root
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    type: com.alibaba.druid.pool.DruidDataSource
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            # ==================== API Docs Routes ====================
+            - id: auth-docs
+              uri: ${gateway.services.auth}
+              predicates:
+                - Path=/v3/api-docs/auth
+              filters:
+                - RewritePath=/v3/api-docs/auth, /v3/api-docs
+                - SwaggerServersRewrite
+              metadata:
+                auth-required: false
 
-    # Druid 连接池配置
-    druid:
-      initial-size: 2
-      min-idle: 1
-      max-active: 5
-      max-wait: 60000
-      test-while-idle: true
-      test-on-borrow: false
-      test-on-return: false
-      validation-query: SELECT 1
-      time-between-eviction-runs-millis: 60000
-      min-evictable-idle-time-millis: 300000
+            - id: product-docs
+              uri: ${gateway.services.product}
+              predicates:
+                - Path=/v3/api-docs/product
+              filters:
+                - RewritePath=/v3/api-docs/product, /v3/api-docs
+                - SwaggerServersRewrite
+              metadata:
+                auth-required: false
 
-      # Druid 监控配置
-      stat-view-servlet:
-        enabled: true
-        url-pattern: /druid/*
-        login-username: admin
-        login-password: admin
-        reset-enable: false
+            - id: point-docs
+              uri: ${gateway.services.point}
+              predicates:
+                - Path=/v3/api-docs/point
+              filters:
+                - RewritePath=/v3/api-docs/point, /v3/api-docs
+                - SwaggerServersRewrite
+              metadata:
+                auth-required: false
 
-      # SQL 监控配置
-      filter:
-        stat:
-          enabled: true
-          log-slow-sql: true
-          slow-sql-millis: 1000
-        wall:
-          enabled: true
-          config:
-            multi-statement-allow: true
-            none-base-statement-allow: true
+            - id: order-docs
+              uri: ${gateway.services.order}
+              predicates:
+                - Path=/v3/api-docs/order
+              filters:
+                - RewritePath=/v3/api-docs/order, /v3/api-docs
+                - SwaggerServersRewrite
+              metadata:
+                auth-required: false
 
-# MyBatis-Plus 配置 (Local 环境特定)
-mybatis-plus:
-  configuration:
-    # DEBUG 日志 + SQL 格式化
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-  global-config:
-    db-config:
-      # SQL 格式化输出 (便于调试)
-      banner: true
+            # ==================== Public Routes (no auth) ====================
+            - id: auth-public
+              uri: ${gateway.services.auth}
+              predicates:
+                - Path=/api/v1/public/auth/**
+              metadata:
+                auth-required: false
 
-# Security 配置
-security:
-  jwt:
-    # JWT 签名密钥 (本地开发环境使用固定密钥，生产环境应使用环境变量)
-    secret: local-dev-secret-key-for-jwt-token-must-be-at-least-256-bits-long-for-hmac-sha256
-    # JWT Token 过期时间 (单位: 秒，2小时 = 7200秒)
-    expiration: 7200
-    # JWT Token 发行者
-    issuer: awsome-shop-gateway-service
-  # 防暴力破解配置
-  login:
-    # 登录失败最大次数
-    max-failed-attempts: 5
-    # 账号锁定时长 (单位: 秒，30分钟 = 1800秒)
-    lock-duration: 1800
+            - id: product-public
+              uri: ${gateway.services.product}
+              predicates:
+                - Path=/api/v1/public/product/**
+              metadata:
+                auth-required: false
 
-# Shop 配置
-shop:
-  security:
-    encryption:
-      # AES-256 加密密钥 (32字节，本地开发环境使用固定密钥)
-      key: localDevEncryptionKey1234567890ab
+            - id: point-public
+              uri: ${gateway.services.point}
+              predicates:
+                - Path=/api/v1/public/point/**
+              metadata:
+                auth-required: false
 
+            - id: order-public
+              uri: ${gateway.services.order}
+              predicates:
+                - Path=/api/v1/public/order/**
+              metadata:
+                auth-required: false
+
+            # ==================== Protected Routes (auth required) ====================
+            - id: auth-protected
+              uri: ${gateway.services.auth}
+              predicates:
+                - Path=/api/v1/auth/**
+              metadata:
+                auth-required: true
+
+            - id: product-protected
+              uri: ${gateway.services.product}
+              predicates:
+                - Path=/api/v1/product/**
+              metadata:
+                auth-required: true
+
+            - id: point-protected
+              uri: ${gateway.services.point}
+              predicates:
+                - Path=/api/v1/point/**
+              metadata:
+                auth-required: true
+
+            - id: order-protected
+              uri: ${gateway.services.order}
+              predicates:
+                - Path=/api/v1/order/**
+              metadata:
+                auth-required: true
+
+            # ==================== Service-Prefix Routes (Swagger Try-it-out) ====================
+            - id: auth-proxy
+              uri: ${gateway.services.auth}
+              predicates:
+                - Path=/auth/**
+              filters:
+                - StripPrefix=1
+              metadata:
+                auth-required: false
+
+            - id: product-proxy
+              uri: ${gateway.services.product}
+              predicates:
+                - Path=/product/**
+              filters:
+                - StripPrefix=1
+              metadata:
+                auth-required: false
+
+            - id: point-proxy
+              uri: ${gateway.services.point}
+              predicates:
+                - Path=/point/**
+              filters:
+                - StripPrefix=1
+              metadata:
+                auth-required: false
+
+            - id: order-proxy
+              uri: ${gateway.services.order}
+              predicates:
+                - Path=/order/**
+              filters:
+                - StripPrefix=1
+              metadata:
+                auth-required: false
+
+# SpringDoc - Swagger aggregation for all backend services
+springdoc:
+  swagger-ui:
+    urls:
+      - name: auth
+        url: /v3/api-docs/auth
+      - name: product
+        url: /v3/api-docs/product
+      - name: point
+        url: /v3/api-docs/point
+      - name: order
+        url: /v3/api-docs/order
